@@ -134,27 +134,90 @@ int main(int argc, char *argv[])
 		// morphologyEx(cannyDetection, cannyDetection, cv::MORPH_OPEN, element);
 		// morphologyEx(cannyDetection, cannyDetection, cv::MORPH_OPEN, element);
 
-        // if(mode == 8)
-        // {
-        //     cv::imshow("w", cannyDetection);
-        // }
+		Mat drawing = Mat::zeros(cannyDetection.size(), CV_8UC3);
+
+		Mat cannyDetectionClone = cannyDetection.clone();
+
+		RNG rng(12345);
+        int rows = cannyDetectionClone.size[0] - 1;
+		int cols = cannyDetectionClone.size[1] - 1;
+
+		vector<vector<Point>> contours;
+		vector<vector<Point>> smallContours;
+		double contSum = 0;
+
+		cv::findContours(cannyDetectionClone, contours, CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
+		// This function changes its input!
+
+		for(int i = 0; i < contours.size(); i++)
+		{
+			contSum += cv::contourArea(contours[i]);
+		}
+
+		double contAvg = contSum / contours.size();
+
+		for(int i = 0; i < contours.size(); i++)
+		{
+			Scalar color = Scalar(rng.uniform(0,255), rng.uniform(0,255), rng.uniform(0,255));
+
+			double currArea = cv::contourArea(contours[i]);
+			if(currArea < contAvg / 2)
+			{
+				cv::drawContours(drawing, contours, i, color);
+				smallContours.push_back(contours[i]);
+			}
+		}
+
+		if(mode == 4)
+		{
+			cv::imshow("w", drawing);
+		}
+
+		// Mat newCannyDetection = cannyDetection.clone();
+
+		for(int i = 0; i < smallContours.size(); i++)
+		{
+			cv::drawContours(cannyDetection, smallContours, i, Scalar(0, 0, 0), -1);
+		}
+
+		cv::dilate(cannyDetection, cannyDetection, Mat());
+
+		if(mode == 5)
+		{
+			cv::imshow("w", cannyDetection);
+		}
+
+		for(int i = 0;  i < rows; i++)
+		{
+			for(int t = 0; t < 3; t++)
+			{
+				cannyDetection.at<uchar>(i, t) = (uchar)0;
+				cannyDetection.at<uchar>(i, cols - t) = (uchar)0;
+			}
+		}
+
+		for(int i = 0;  i < cols; i++)
+		{
+			for(int t = 0; t < 3; t++)
+			{
+				cannyDetection.at<uchar>(t, i) = (uchar)0;
+				cannyDetection.at<uchar>(rows - t, i) = (uchar)0;
+			}
+		}
 
 		Mat cannyDetectionBlured;
 		cv::blur(cannyDetection, cannyDetectionBlured, Size{8, 8});
 
-		if(mode == 4)
+		if(mode == 6)
 		{
 			cv::imshow("w", cannyDetectionBlured);
 		}
 
-		Mat drawing = Mat::zeros(cannyDetectionBlured.size(), CV_8UC3);
 		Mat biggest = Mat::zeros(cannyDetectionBlured.size(), CV_8U);
+
 		int chosenContour = 0;
 
 		int maxArea = 0;
-		RNG rng(12345);
-        int rows = cannyDetectionBlured.size[0] - 1;
-		int cols = cannyDetectionBlured.size[1] - 1;
 
 		if(boarderLines)
 		{
@@ -173,7 +236,9 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		vector<vector<Point>> contours;
+		// Make sure we start fresh now with the canny detection...
+		contours.clear();
+		drawing = Mat::zeros(cannyDetection.size(), CV_8UC3);
 		cv::findContours(cannyDetectionBlured, contours, CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
 
 		for(int i = 0; i < contours.size(); i++)
@@ -205,12 +270,12 @@ int main(int argc, char *argv[])
 		contours[chosenContour] = newCont;
 		cv::drawContours(biggest, contours, chosenContour, Scalar(255), -1);
 
-		if(mode == 5)
+		if(mode == 7)
 		{
 			cv::imshow("w", drawing);
 		}
 
-		if(mode == 6)
+		if(mode == 8)
 		{
 			cv::imshow("w", biggest);
 		}
@@ -222,7 +287,7 @@ int main(int argc, char *argv[])
 		// 	cv::imshow("w", biggest);
 		// }
 
-		if(mode == 7)
+		if(mode == 9)
 		{
 			cv::RotatedRect drawRect = cv::minAreaRect(contours[chosenContour]);
 			cv::Point2f vertices[4];
@@ -302,10 +367,10 @@ int main(int argc, char *argv[])
 		thresholdValue = pointsInsideContour[pointsInsideContour.size() / 2] + 10;
 		cv::threshold(grayscale, finalImageMedian, thresholdValue, 255, cv::THRESH_BINARY_INV);
 
-		if(mode == 9)
-		{
-			cv::imshow("w", finalImageMedian);
-		}
+		// if(mode == 9)
+		// {
+		// 	cv::imshow("w", finalImageMedian);
+		// }
 
 		frameCount++;
 
