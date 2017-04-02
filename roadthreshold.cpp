@@ -121,6 +121,7 @@ int main(int argc, char *argv[])
 
 		cv::Canny(blurred, cannyDetection, cannyLowThreshold, cannyHighThreshold);
 		cv::dilate(cannyDetection, cannyDetection, Mat());
+		cv::dilate(cannyDetection, cannyDetection, Mat());
 
 		if (mode == 3)
 		{
@@ -161,7 +162,7 @@ int main(int argc, char *argv[])
 			Scalar color = Scalar(rng.uniform(0,255), rng.uniform(0,255), rng.uniform(0,255));
 
 			double currArea = cv::contourArea(contours[i]);
-			if(currArea < contAvg / 2)
+			if(currArea < contAvg / 3)
 			{
 				cv::drawContours(drawing, contours, i, color);
 				smallContours.push_back(contours[i]);
@@ -280,6 +281,27 @@ int main(int argc, char *argv[])
 			cv::imshow("w", biggest);
 		}
 
+		Mat maskedBiggest = Mat::zeros(cannyDetectionBlured.size(), CV_8U);
+		bitwise_and(grayscale, biggest, maskedBiggest);
+
+		if(mode == 9)
+		{
+				cv::imshow("w", maskedBiggest);
+		}
+
+		vector<uchar> valuesToThreshold;
+
+		for(int i = 0; i < maskedBiggest.rows; i++)
+		{
+			for(int j = 0; j < maskedBiggest.cols; j++)
+			{
+				if(maskedBiggest.at<uchar>(i, j) > 0)
+					valuesToThreshold.push_back(maskedBiggest.at<uchar>(i, j));
+			}
+		}
+
+		double optimalThresholdByContour = cv::threshold(valuesToThreshold, valuesToThreshold, 100, 200, cv::THRESH_OTSU);
+
 		// if(mode == 'v')
 		// {
 		// 	Rect drawRect = cv::boundingRect(contours[chosenContour]);
@@ -287,90 +309,98 @@ int main(int argc, char *argv[])
 		// 	cv::imshow("w", biggest);
 		// }
 
-		if(mode == 9)
+		// TODO: look at this function. it crashes when everything is blurry...
+
+		try
 		{
 			cv::RotatedRect drawRect = cv::minAreaRect(contours[chosenContour]);
 			cv::Point2f vertices[4];
 			drawRect.points(vertices);
-			for (int i = 0; i < 4; i++)
-				line(biggest, vertices[i], vertices[(i+1)%4], Scalar(255));
 
-			cv::imshow("w", biggest);
-		}
+			vector<Point> dummyVertices;
+			dummyVertices.push_back(vertices[0]);
+			dummyVertices.push_back(vertices[1]);
+			dummyVertices.push_back(vertices[2]);
+			dummyVertices.push_back(vertices[3]);
 
-		Mat newImage = Mat::zeros(cannyDetectionBlured.size(), CV_8U);
-		bitwise_and(grayscale, biggest, newImage);
-
-		// if(mode == 7)
-		// {
-		// 	cv::imshow("w", newImage);
-		// }
-
-		//Mat_<CV_8U> newIm {newImage};
-
-		//cout << (int)grayscale.at<uchar>(0, 0) << endl;
-		//cout << newImage.size()<< endl;
-
-		vector<int> pointsInsideContour;
-		for(int i = 0; i < newImage.cols; i++)
-		{
-			for(int j = 0; j < newImage.rows; j++)
+			if(mode == 'q')
 			{
-				if((int)newImage.at<uchar>(i, j) > 0)
+				for (int i = 0; i < 4; i++)
+					line(biggest, vertices[i], vertices[(i+1)%4], Scalar(255));
+
+				cv::imshow("w", biggest);
+			}
+
+			vector<vector<Point> > contourDummy = vector<vector<Point>>(1, dummyVertices);
+			cv::drawContours(biggest, contourDummy, 0, Scalar(255), -1);
+
+			if(mode == 'w')
+			{
+				cv::imshow("w", biggest);
+			}
+
+			Mat rectMask = Mat::zeros(cannyDetectionBlured.size(), CV_8U);
+			bitwise_and(grayscale, biggest, rectMask);
+
+			if(mode == 'e')
+			{
+				cv::imshow("w", rectMask);
+			}
+
+			vector<uchar> valuesToThresholdRect;
+
+			for(int i = 0; i < maskedBiggest.rows; i++)
+			{
+				for(int j = 0; j < maskedBiggest.cols; j++)
 				{
-					pointsInsideContour.push_back((int)newImage.at<uchar>(i, j));
+					if(biggest.at<uchar>(i, j) == 0)
+						rectMask.at<uchar>(i, j) = 255;
+					else
+						valuesToThresholdRect.push_back(rectMask.at<uchar>(i, j));
 				}
 			}
+
+			Mat thresholdByContour = Mat::zeros(cannyDetectionBlured.size(), CV_8U);
+			Mat thresholdByMask = Mat::zeros(cannyDetectionBlured.size(), CV_8U);
+
+			cv::threshold(rectMask, thresholdByContour, optimalThresholdByContour, 200, cv::THRESH_BINARY);
+
+			cout << valuesToThresholdRect.size() << " " << valuesToThreshold.size() << endl;
+
+			double optimalRectThreshold = cv::threshold(valuesToThresholdRect, valuesToThresholdRect, 100, 200, cv::THRESH_OTSU);
+			cv::threshold(rectMask, thresholdByMask, optimalRectThreshold, 200, cv::THRESH_BINARY);
+			cout << optimalRectThreshold << " " << optimalThresholdByContour << endl;
+
+			if(mode == 'r')
+			{
+				cv::imshow("w", thresholdByContour);
+			}
+
+			if(mode == 't')
+			{
+				cv::imshow("w", thresholdByMask);
+			}
+
 		}
-
-		// cout << pointsInsideContour.size() << endl;
-
-		Mat finalImageMean;
-
-		int sum = 0;
-		int avg = 0;
-
-		for(auto& greyVal : pointsInsideContour)
+		catch( cv::Exception& e )
 		{
-			sum += greyVal;
+			const char* err_msg = e.what();
+			std::cout << "exception caught: " << err_msg << std::endl;
 		}
 
-		avg = sum / pointsInsideContour.size();
-		//cout << avg << endl;
 
-		int thresholdValue = avg + 20;
+		// Mat newImage = Mat::zeros(cannyDetectionBlured.size(), CV_8U);
+		// bitwise_and(grayscale, biggest, newImage);
 
-		// if(firstIter)
-		// {
-		// 	oldThresholdValue = thresholdValue;
-		// 	firstIter = false;
-		// }
-		// else
-		// {
-		// 	if(abs(oldThresholdValue - thresholdValue) > 40)
-		// 	{
-		// 		paused = true;
-		// 	}
-		// 	oldThresholdValue = thresholdValue;
-		// }
+		// // if(mode == 7)
+		// // {
+		// // 	cv::imshow("w", newImage);
+		// // }
 
-		cv::threshold(grayscale, finalImageMean, thresholdValue, 255, cv::THRESH_BINARY_INV);
+		// //Mat_<CV_8U> newIm {newImage};
 
-		// if(mode == 8)
-		// {
-		// 	cv::imshow("w", finalImageMean);
-		// }
-
-		Mat finalImageMedian;
-		std::nth_element(pointsInsideContour.begin(), pointsInsideContour.begin() + pointsInsideContour.size() / 2, pointsInsideContour.end());
-
-		thresholdValue = pointsInsideContour[pointsInsideContour.size() / 2] + 10;
-		cv::threshold(grayscale, finalImageMedian, thresholdValue, 255, cv::THRESH_BINARY_INV);
-
-		// if(mode == 9)
-		// {
-		// 	cv::imshow("w", finalImageMedian);
-		// }
+		// //cout << (int)grayscale.at<uchar>(0, 0) << endl;
+		// //cout << newImage.size()<< endl;
 
 		frameCount++;
 
@@ -394,7 +424,7 @@ int main(int argc, char *argv[])
 		{
 			paused = !paused;
 		}
-        else if (pressedKey == 'q')
+        else if (pressedKey == 'z')
 		{
             return 1;
 		}
