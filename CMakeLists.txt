@@ -14,3 +14,7 @@ target_link_libraries(roadthreshold ${OpenCV_LIBS})
 add_executable(thresholdfun thresholdfun.cpp)
 target_link_libraries(thresholdfun ${OpenCV_LIBS})
 
+add_executable(squarethreshold squarethreshold.cpp)
+target_link_libraries(squarethreshold ${OpenCV_LIBS})
+
+
